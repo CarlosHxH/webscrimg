@@ -3,9 +3,23 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
+const cors = require('cors');
 const app = express();
 
+// Middleware
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'DELETE', 'PUT', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+}));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
 
 // Configuração do Swagger
 const swaggerOptions = {
@@ -403,6 +417,8 @@ app.get('/api/scrape/bing-images', async (req, res) => {
       });
     }
 
+    console.log(`[Bing] Buscando: ${query}, página: ${page}, limit: ${limit}`);
+
     const first = (page - 1) * limit;
     const searchUrl = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&first=${first}&count=${limit}&safeSearch=${safeSearch}`;
 
@@ -410,14 +426,21 @@ app.get('/api/scrape/bing-images', async (req, res) => {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
-      }
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
+      },
+      timeout: 15000,
+      maxRedirects: 5
     });
+
+    console.log(`[Bing] Status da resposta: ${response.status}`);
 
     const $ = cheerio.load(response.data);
     const images = [];
 
-    // Extrair de atributos m (metadata do Bing)
+    // Método 1: Extrair de atributos m (metadata do Bing)
     $('a.iusc').each((i, elem) => {
       const m = $(elem).attr('m');
       if (m) {
@@ -438,17 +461,55 @@ app.get('/api/scrape/bing-images', async (req, res) => {
       }
     });
 
-    // Fallback: extrair de tags img
+    // Método 2: Extrair de data attributes
     if (images.length === 0) {
-      $('img.mimg').each((i, elem) => {
+      $('.imgpt').each((i, elem) => {
+        const parent = $(elem).parent();
+        const img = $(elem).find('img');
+        const dataUrl = parent.attr('href') || img.attr('src');
+        
+        if (dataUrl) {
+          images.push({
+            url: dataUrl,
+            thumbnail: img.attr('src') || dataUrl,
+            title: img.attr('alt') || ''
+          });
+        }
+      });
+    }
+
+    // Método 3: Fallback - extrair de tags img
+    if (images.length === 0) {
+      $('img').each((i, elem) => {
         const src = $(elem).attr('src') || $(elem).attr('data-src');
-        if (src && src.startsWith('http')) {
+        if (src && src.startsWith('http') && !src.includes('bing.com/th')) {
           images.push({
             url: src,
             thumbnail: src,
             title: $(elem).attr('alt') || ''
           });
         }
+      });
+    }
+
+    console.log(`[Bing] Imagens encontradas: ${images.length}`);
+
+    // Se não encontrou imagens, retornar dados de exemplo para teste
+    if (images.length === 0) {
+      console.log('[Bing] Nenhuma imagem encontrada, retornando resposta vazia');
+      return res.json({
+        query,
+        engine: 'bing',
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: 0,
+        images: [],
+        pagination: {
+          currentPage: parseInt(page),
+          hasNextPage: false,
+          nextPage: parseInt(page) + 1
+        },
+        warning: 'Nenhuma imagem encontrada. O Bing pode estar bloqueando o scraping. Considere usar a API oficial do Bing.'
       });
     }
 
@@ -475,9 +536,14 @@ app.get('/api/scrape/bing-images', async (req, res) => {
     });
 
   } catch (error) {
+    console.error('[Bing] Erro:', error.message);
     res.status(500).json({ 
       error: 'Erro ao fazer scraping do Bing',
-      message: error.message 
+      message: error.message,
+      details: error.response ? {
+        status: error.response.status,
+        statusText: error.response.statusText
+      } : null
     });
   }
 });
@@ -980,26 +1046,39 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-const host = process.env.HOST || 'localhost';
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
-app.listen(port, host, () => {
-  console.log(`🚀 API de Web Scraper rodando em http://${host}:${port}`);
-  console.log(`\n📖 Documentação Swagger disponível em: http://${host}/api-docs`);
-  console.log(`📄 JSON da API: http://${host}/api-docs.json`);
-  console.log(`\n📍 Endpoints disponíveis:\n`);
-  console.log(`🔍 Motores de Busca:`);
-  console.log(`   GET  http://${host}/api/scrape/google-images?query=gatos&page=1&limit=20`);
-  console.log(`   GET  http://${host}/api/scrape/bing-images?query=gatos&page=1&limit=20`);
-  console.log(`   GET  http://${host}/api/scrape/duckduckgo-images?query=gatos&page=1&limit=20`);
-  console.log(`   GET  http://${host}/api/scrape/all-engines?query=gatos&limit=10`);
-  console.log(`\n📚 Bases de Conhecimento:`);
-  console.log(`   GET  http://${host}/api/scrape/knowledge-base/:baseName?query=exemplo`);
-  console.log(`   GET  http://${host}/api/scrape/multi-source?query=exemplo&sources=wikipedia,unsplash`);
-  console.log(`   GET  http://${host}/api/knowledge-bases`);
-  console.log(`   POST http://${host}/api/knowledge-base`);
-  console.log(`   DELETE http://${host}/api/knowledge-base/:name`);
-  console.log(`\n💡 Suporte para: Google, Bing, DuckDuckGo + bases personalizadas`);
+app.listen(PORT, () => {
+  console.log(`
+╔════════════════════════════════════════════════════════════╗
+║  🚀 API de Web Scraper de Imagens                         ║
+║  📡 Servidor rodando na porta ${PORT}                     ║
+╚════════════════════════════════════════════════════════════╝
+
+📖 Documentação Swagger: http://localhost:${PORT}/api-docs
+📄 JSON da API: http://localhost:${PORT}/api-docs.json
+💚 Health Check: http://localhost:${PORT}/api/health
+
+📍 Endpoints Disponíveis:
+
+🔍 MOTORES DE BUSCA:
+   GET /api/scrape/google-images
+   GET /api/scrape/bing-images
+   GET /api/scrape/duckduckgo-images
+   GET /api/scrape/all-engines
+
+📚 BASES DE CONHECIMENTO:
+   GET    /api/knowledge-bases
+   POST   /api/knowledge-base
+   DELETE /api/knowledge-base/:name
+   GET    /api/scrape/knowledge-base/:baseName
+   GET    /api/scrape/multi-source
+
+🔧 Exemplo de uso:
+   curl http://localhost:${PORT}/api/scrape/bing-images?query=gato&limit=5
+
+💡 CORS habilitado para todos os domínios
+  `);
 });
 
 module.exports = app;
