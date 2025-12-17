@@ -44,8 +44,8 @@ const swaggerOptions = {
         description: 'Servidor de Desenvolvimento'
       },
       {
-        url: 'https://api.webscraper.com',
-        description: 'Servidor de Produção'
+        url: 'http://localhost:3000',
+        description: 'Servidor Local'
       }
     ],
     tags: [
@@ -72,11 +72,20 @@ const swaggerOptions = {
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
-// Rota do Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+// Configuração customizada do Swagger UI
+const swaggerUiOptions = {
   customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'API Web Scraper - Documentação'
-}));
+  customSiteTitle: 'API Web Scraper - Documentação',
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+    filter: true,
+    tryItOutEnabled: true
+  }
+};
+
+// Rota do Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
 
 // Rota para obter o JSON do Swagger
 app.get('/api-docs.json', (req, res) => {
@@ -300,27 +309,36 @@ app.get('/api/scrape/google-images', async (req, res) => {
       });
     }
 
+    console.log(`[Google] Buscando: ${query}, página: ${page}, limit: ${limit}`);
+
     const start = (page - 1) * limit;
     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&tbm=isch&start=${start}&safe=${safeSearch}`;
 
     const response = await axios.get(searchUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive'
+      },
+      timeout: 15000
     });
+
+    console.log(`[Google] Status da resposta: ${response.status}`);
 
     const $ = cheerio.load(response.data);
     const images = [];
 
-    // Extrair URLs de imagens dos scripts JSON
+    // Método 1: Extrair URLs de imagens dos scripts JSON
     $('script').each((i, elem) => {
       const content = $(elem).html();
       if (content && content.includes('AF_initDataCallback')) {
-        const matches = content.match(/"(https:\/\/[^"]*\.(jpg|jpeg|png|gif|webp)[^"]*)"/gi);
+        const matches = content.match(/"(https?:\/\/[^"]*\.(jpg|jpeg|png|gif|webp)[^"]*)"/gi);
         if (matches) {
           matches.forEach(match => {
             const url = match.replace(/"/g, '');
-            if (url.startsWith('http') && !images.includes(url) && images.length < limit) {
+            if (url.startsWith('http') && !images.includes(url) && images.length < limit * 2) {
               images.push(url);
             }
           });
@@ -328,13 +346,43 @@ app.get('/api/scrape/google-images', async (req, res) => {
       }
     });
 
-    // Fallback: extrair de tags img
+    // Método 2: Extrair de data attributes
+    if (images.length < limit) {
+      $('img[data-src]').each((i, elem) => {
+        const src = $(elem).attr('data-src');
+        if (src && src.startsWith('http') && !images.includes(src)) {
+          images.push(src);
+        }
+      });
+    }
+
+    // Método 3: Fallback - extrair de tags img
     if (images.length < limit) {
       $('img').each((i, elem) => {
         const src = $(elem).attr('src');
-        if (src && src.startsWith('http') && !images.includes(src) && images.length < limit) {
+        if (src && src.startsWith('http') && !images.includes(src) && !src.includes('logo')) {
           images.push(src);
         }
+      });
+    }
+
+    console.log(`[Google] Imagens encontradas: ${images.length}`);
+
+    // Se não encontrou imagens suficientes
+    if (images.length === 0) {
+      return res.json({
+        query,
+        engine: 'google',
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: 0,
+        images: [],
+        pagination: {
+          currentPage: parseInt(page),
+          hasNextPage: false,
+          nextPage: parseInt(page) + 1
+        },
+        warning: 'Nenhuma imagem encontrada. O Google pode estar bloqueando o scraping. Considere usar a API oficial do Google Custom Search.'
       });
     }
 
@@ -358,9 +406,14 @@ app.get('/api/scrape/google-images', async (req, res) => {
     });
 
   } catch (error) {
+    console.error('[Google] Erro:', error.message);
     res.status(500).json({ 
-      error: 'Erro ao fazer scraping',
-      message: error.message 
+      error: 'Erro ao fazer scraping do Google',
+      message: error.message,
+      details: error.response ? {
+        status: error.response.status,
+        statusText: error.response.statusText
+      } : null
     });
   }
 });
@@ -1046,13 +1099,64 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+/**
+ * @swagger
+ * /:
+ *   get:
+ *     summary: Página inicial da API
+ *     tags: [Sistema]
+ *     responses:
+ *       200:
+ *         description: Informações básicas da API
+ */
+// Rota raiz
+app.get('/', (req, res) => {
+  res.json({
+    name: 'API de Web Scraper de Imagens',
+    version: '1.0.0',
+    description: 'API para scraping de imagens do Google, Bing, DuckDuckGo e bases personalizadas',
+    documentation: '/api-docs',
+    endpoints: {
+      search_engines: [
+        '/api/scrape/google-images',
+        '/api/scrape/bing-images',
+        '/api/scrape/duckduckgo-images',
+        '/api/scrape/all-engines'
+      ],
+      knowledge_bases: [
+        '/api/knowledge-bases',
+        '/api/knowledge-base',
+        '/api/scrape/knowledge-base/:baseName',
+        '/api/scrape/multi-source'
+      ],
+      system: [
+        '/api/health'
+      ]
+    },
+    usage_examples: [
+      {
+        description: 'Buscar imagens no Google',
+        url: '/api/scrape/google-images?query=gatos&limit=10'
+      },
+      {
+        description: 'Buscar em todos os motores',
+        url: '/api/scrape/all-engines?query=natureza&limit=5'
+      },
+      {
+        description: 'Listar bases de conhecimento',
+        url: '/api/knowledge-bases'
+      }
+    ]
+  });
+});
+
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════════════════════════╗
-║  🚀 API de Web Scraper de Imagens                         ║
-║  📡 Servidor rodando na porta ${PORT}                     ║
+║  🚀 API de Web Scraper de Imagens                          ║
+║  📡 Servidor rodando na porta ${PORT}                         ║
 ╚════════════════════════════════════════════════════════════╝
 
 📖 Documentação Swagger: http://localhost:${PORT}/api-docs
