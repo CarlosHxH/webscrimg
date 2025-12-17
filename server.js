@@ -40,8 +40,12 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: 'http://localhost:3000',
-        description: 'Servidor de Desenvolvimento'
+        url: 'http://q00cc84kgc4o0o0skcw4cgwg.37.27.45.54.sslip.io',
+        description: 'Servidor de Produção'
+      },
+      {
+        url: 'https://q00cc84kgc4o0o0skcw4cgwg.37.27.45.54.sslip.io',
+        description: 'Servidor de Produção (HTTPS)'
       },
       {
         url: 'http://localhost:3000',
@@ -80,7 +84,9 @@ const swaggerUiOptions = {
     persistAuthorization: true,
     displayRequestDuration: true,
     filter: true,
-    tryItOutEnabled: true
+    tryItOutEnabled: true,
+    defaultModelsExpandDepth: 3,
+    defaultModelExpandDepth: 3
   }
 };
 
@@ -1111,40 +1117,45 @@ app.get('/api/health', (req, res) => {
  */
 // Rota raiz
 app.get('/', (req, res) => {
+  const host = req.get('host');
+  const protocol = req.protocol;
+  const baseUrl = `${protocol}://${host}`;
+  
   res.json({
     name: 'API de Web Scraper de Imagens',
     version: '1.0.0',
     description: 'API para scraping de imagens do Google, Bing, DuckDuckGo e bases personalizadas',
-    documentation: '/api-docs',
+    baseUrl: baseUrl,
+    documentation: `${baseUrl}/api-docs`,
     endpoints: {
       search_engines: [
-        '/api/scrape/google-images',
-        '/api/scrape/bing-images',
-        '/api/scrape/duckduckgo-images',
-        '/api/scrape/all-engines'
+        `${baseUrl}/api/scrape/google-images`,
+        `${baseUrl}/api/scrape/bing-images`,
+        `${baseUrl}/api/scrape/duckduckgo-images`,
+        `${baseUrl}/api/scrape/all-engines`
       ],
       knowledge_bases: [
-        '/api/knowledge-bases',
-        '/api/knowledge-base',
-        '/api/scrape/knowledge-base/:baseName',
-        '/api/scrape/multi-source'
+        `${baseUrl}/api/knowledge-bases`,
+        `${baseUrl}/api/knowledge-base`,
+        `${baseUrl}/api/scrape/knowledge-base/:baseName`,
+        `${baseUrl}/api/scrape/multi-source`
       ],
       system: [
-        '/api/health'
+        `${baseUrl}/api/health`
       ]
     },
     usage_examples: [
       {
         description: 'Buscar imagens no Google',
-        url: '/api/scrape/google-images?query=gatos&limit=10'
+        url: `${baseUrl}/api/scrape/google-images?query=gatos&limit=10`
       },
       {
         description: 'Buscar em todos os motores',
-        url: '/api/scrape/all-engines?query=natureza&limit=5'
+        url: `${baseUrl}/api/scrape/all-engines?query=natureza&limit=5`
       },
       {
         description: 'Listar bases de conhecimento',
-        url: '/api/knowledge-bases'
+        url: `${baseUrl}/api/knowledge-bases`
       }
     ]
   });
@@ -1153,35 +1164,41 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
+  const isDocker = process.env.DOCKER_CONTAINER === 'true' || process.env.KUBERNETES_SERVICE_HOST;
+  const publicUrl = process.env.PUBLIC_URL || 'http://q00cc84kgc4o0o0skcw4cgwg.37.27.45.54.sslip.io';
+  
   console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║  🚀 API de Web Scraper de Imagens                          ║
 ║  📡 Servidor rodando na porta ${PORT}                         ║
 ╚════════════════════════════════════════════════════════════╝
 
-📖 Documentação Swagger: http://localhost:${PORT}/api-docs
-📄 JSON da API: http://localhost:${PORT}/api-docs.json
-💚 Health Check: http://localhost:${PORT}/api/health
+${isDocker ? '🐳 Ambiente: Docker/Container' : '💻 Ambiente: Local'}
+
+📖 Documentação Swagger: ${publicUrl}/api-docs
+📄 JSON da API: ${publicUrl}/api-docs.json
+💚 Health Check: ${publicUrl}/api/health
+🏠 Home: ${publicUrl}/
 
 📍 Endpoints Disponíveis:
 
 🔍 MOTORES DE BUSCA:
-   GET /api/scrape/google-images
-   GET /api/scrape/bing-images
-   GET /api/scrape/duckduckgo-images
-   GET /api/scrape/all-engines
+   GET ${publicUrl}/api/scrape/google-images?query=gato&limit=10
+   GET ${publicUrl}/api/scrape/bing-images?query=gato&limit=10
+   GET ${publicUrl}/api/scrape/duckduckgo-images?query=gato&limit=10
+   GET ${publicUrl}/api/scrape/all-engines?query=gato&limit=5
 
 📚 BASES DE CONHECIMENTO:
-   GET    /api/knowledge-bases
-   POST   /api/knowledge-base
-   DELETE /api/knowledge-base/:name
-   GET    /api/scrape/knowledge-base/:baseName
-   GET    /api/scrape/multi-source
+   GET    ${publicUrl}/api/knowledge-bases
+   POST   ${publicUrl}/api/knowledge-base
+   DELETE ${publicUrl}/api/knowledge-base/:name
+   GET    ${publicUrl}/api/scrape/knowledge-base/:baseName?query=tech
+   GET    ${publicUrl}/api/scrape/multi-source?query=tech&sources=wikipedia
 
-🔧 Exemplo de uso:
-   curl http://localhost:${PORT}/api/scrape/bing-images?query=gato&limit=5
+🔧 Teste rápido:
+   curl ${publicUrl}/api/health
 
-💡 CORS habilitado para todos os domínios
+💡 CORS habilitado | Suporte: Google, Bing, DuckDuckGo + bases personalizadas
   `);
 });
 
