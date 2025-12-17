@@ -311,31 +311,3 @@ async function getAllPages(query, maxPages = 3) {
   }
   return results;
 }
-```
-
-### Busca Agregada
-```javascript
-// Buscar em todos os motores e combinar resultados
-async function aggregateSearch(query) {
-  const response = await fetch(
-    `http://localhost:3000/api/scrape/all-engines?query=${query}&limit=10`
-  );
-  const data = await response.json();
-  
-  const allImages = [
-    ...data.engines.google.images || [],
-    ...data.engines.bing.images || [],
-    ...data.engines.duckduckgo.images || []
-  ];
-  
-  return allImages;
-}
-```
-
-## 📧 Suporte
-
-Para questões e sugestões, abra uma issue no repositório ou entre em contato.
-
----
-
-**Desenvolvido com ❤️ usando Node.js, Express e Cheerio**
