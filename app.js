@@ -1,74 +1,9 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const swaggerUi = require('swagger-ui-express');
-const swaggerJsdoc = require('swagger-jsdoc');
 const app = express();
 
 app.use(express.json());
-
-// Configuração do Swagger
-const swaggerOptions = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'API de Web Scraper de Imagens',
-      version: '1.0.0',
-      description: 'API para scraping de imagens do Google, Bing, DuckDuckGo e bases de conhecimento personalizadas',
-      contact: {
-        name: 'API Support',
-        email: 'support@webscraper.com'
-      },
-      license: {
-        name: 'MIT',
-        url: 'https://opensource.org/licenses/MIT'
-      }
-    },
-    servers: [
-      {
-        url: 'http://localhost:3000',
-        description: 'Servidor de Desenvolvimento'
-      },
-      {
-        url: 'https://api.webscraper.com',
-        description: 'Servidor de Produção'
-      }
-    ],
-    tags: [
-      {
-        name: 'Motores de Busca',
-        description: 'Endpoints para scraping de imagens em motores de busca'
-      },
-      {
-        name: 'Bases de Conhecimento',
-        description: 'Gerenciamento de bases de conhecimento personalizadas'
-      },
-      {
-        name: 'Multi-Fonte',
-        description: 'Busca combinada em múltiplas fontes'
-      },
-      {
-        name: 'Sistema',
-        description: 'Endpoints de sistema e monitoramento'
-      }
-    ]
-  },
-  apis: ['./server.js', './index.js', './*.js']
-};
-
-const swaggerSpec = swaggerJsdoc(swaggerOptions);
-
-// Rota do Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'API Web Scraper - Documentação'
-}));
-
-// Rota para obter o JSON do Swagger
-app.get('/api-docs.json', (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.send(swaggerSpec);
-});
 
 // Configuração de bases de conhecimento
 const knowledgeBases = new Map([
@@ -77,90 +12,6 @@ const knowledgeBases = new Map([
   ['pexels', 'https://www.pexels.com/search/'],
 ]);
 
-/**
- * @swagger
- * components:
- *   schemas:
- *     Image:
- *       type: object
- *       properties:
- *         id:
- *           type: integer
- *           description: ID único da imagem
- *         url:
- *           type: string
- *           description: URL completa da imagem
- *         thumbnail:
- *           type: string
- *           description: URL da miniatura
- *         title:
- *           type: string
- *           description: Título ou descrição da imagem
- *         width:
- *           type: integer
- *           description: Largura da imagem em pixels
- *         height:
- *           type: integer
- *           description: Altura da imagem em pixels
- *         source:
- *           type: string
- *           description: Fonte da imagem (google, bing, duckduckgo, etc)
- *     
- *     Pagination:
- *       type: object
- *       properties:
- *         currentPage:
- *           type: integer
- *         hasNextPage:
- *           type: boolean
- *         nextPage:
- *           type: integer
- *         totalResults:
- *           type: integer
- *     
- *     KnowledgeBase:
- *       type: object
- *       properties:
- *         name:
- *           type: string
- *           description: Nome da base de conhecimento
- *         baseUrl:
- *           type: string
- *           description: URL base da fonte
- *       required:
- *         - name
- *         - baseUrl
- *     
- *     Error:
- *       type: object
- *       properties:
- *         error:
- *           type: string
- *         message:
- *           type: string
- */
-
-/**
- * @swagger
- * /api/knowledge-base:
- *   post:
- *     summary: Adicionar nova base de conhecimento
- *     tags: [Bases de Conhecimento]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/KnowledgeBase'
- *           example:
- *             name: "pixabay"
- *             baseUrl: "https://pixabay.com/images/search/"
- *     responses:
- *       200:
- *         description: Base de conhecimento adicionada com sucesso
- *       400:
- *         description: Dados inválidos
- */
 // Adicionar nova base de conhecimento
 app.post('/api/knowledge-base', (req, res) => {
   const { name, baseUrl } = req.body;
@@ -179,25 +30,6 @@ app.post('/api/knowledge-base', (req, res) => {
   });
 });
 
-/**
- * @swagger
- * /api/knowledge-bases:
- *   get:
- *     summary: Listar todas as bases de conhecimento
- *     tags: [Bases de Conhecimento]
- *     responses:
- *       200:
- *         description: Lista de bases de conhecimento
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 knowledgeBases:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/KnowledgeBase'
- */
 // Listar bases de conhecimento
 app.get('/api/knowledge-bases', (req, res) => {
   const bases = Array.from(knowledgeBases.entries()).map(([name, url]) => ({
@@ -207,68 +39,6 @@ app.get('/api/knowledge-bases', (req, res) => {
   res.json({ knowledgeBases: bases });
 });
 
-/**
- * @swagger
- * /api/scrape/google-images:
- *   get:
- *     summary: Buscar imagens no Google
- *     tags: [Motores de Busca]
- *     parameters:
- *       - in: query
- *         name: query
- *         required: true
- *         schema:
- *           type: string
- *         description: Termo de busca
- *         example: "gatos fofos"
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Número da página
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *         description: Quantidade de resultados por página
- *       - in: query
- *         name: safeSearch
- *         schema:
- *           type: string
- *           enum: [on, off]
- *           default: on
- *         description: Filtro de conteúdo seguro
- *     responses:
- *       200:
- *         description: Lista de imagens encontradas
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 query:
- *                   type: string
- *                 engine:
- *                   type: string
- *                 page:
- *                   type: integer
- *                 limit:
- *                   type: integer
- *                 total:
- *                   type: integer
- *                 images:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Image'
- *                 pagination:
- *                   $ref: '#/components/schemas/Pagination'
- *       400:
- *         description: Parâmetros inválidos
- *       500:
- *         description: Erro no servidor
- */
 // Scraper de imagens do Google
 app.get('/api/scrape/google-images', async (req, res) => {
   try {
@@ -351,41 +121,6 @@ app.get('/api/scrape/google-images', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/scrape/bing-images:
- *   get:
- *     summary: Buscar imagens no Bing
- *     tags: [Motores de Busca]
- *     parameters:
- *       - in: query
- *         name: query
- *         required: true
- *         schema:
- *           type: string
- *         description: Termo de busca
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *       - in: query
- *         name: safeSearch
- *         schema:
- *           type: string
- *           enum: [Off, Moderate, Strict]
- *           default: Moderate
- *     responses:
- *       200:
- *         description: Lista de imagens do Bing
- *       400:
- *         description: Parâmetros inválidos
- */
 // Scraper de imagens do Bing
 app.get('/api/scrape/bing-images', async (req, res) => {
   try {
@@ -482,39 +217,6 @@ app.get('/api/scrape/bing-images', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/scrape/duckduckgo-images:
- *   get:
- *     summary: Buscar imagens no DuckDuckGo
- *     tags: [Motores de Busca]
- *     parameters:
- *       - in: query
- *         name: query
- *         required: true
- *         schema:
- *           type: string
- *         description: Termo de busca
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *       - in: query
- *         name: safeSearch
- *         schema:
- *           type: string
- *           enum: [on, moderate, off]
- *           default: moderate
- *     responses:
- *       200:
- *         description: Lista de imagens do DuckDuckGo
- */
 // Scraper de imagens do DuckDuckGo
 app.get('/api/scrape/duckduckgo-images', async (req, res) => {
   try {
@@ -626,42 +328,6 @@ app.get('/api/scrape/duckduckgo-images', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/scrape/knowledge-base/{baseName}:
- *   get:
- *     summary: Buscar imagens em uma base de conhecimento específica
- *     tags: [Bases de Conhecimento]
- *     parameters:
- *       - in: path
- *         name: baseName
- *         required: true
- *         schema:
- *           type: string
- *         description: Nome da base de conhecimento
- *         example: "wikipedia"
- *       - in: query
- *         name: query
- *         required: true
- *         schema:
- *           type: string
- *         description: Termo de busca
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *     responses:
- *       200:
- *         description: Imagens da base de conhecimento
- *       404:
- *         description: Base de conhecimento não encontrada
- */
 // Scraper de base de conhecimento específica
 app.get('/api/scrape/knowledge-base/:baseName', async (req, res) => {
   try {
@@ -733,50 +399,6 @@ app.get('/api/scrape/knowledge-base/:baseName', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/scrape/all-engines:
- *   get:
- *     summary: Buscar imagens em todos os motores simultaneamente
- *     tags: [Multi-Fonte]
- *     parameters:
- *       - in: query
- *         name: query
- *         required: true
- *         schema:
- *           type: string
- *         description: Termo de busca
- *         example: "paisagens"
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Limite de resultados por motor
- *     responses:
- *       200:
- *         description: Resultados agregados de todos os motores
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 query:
- *                   type: string
- *                 timestamp:
- *                   type: string
- *                 totalImages:
- *                   type: integer
- *                 engines:
- *                   type: object
- *                   properties:
- *                     google:
- *                       type: object
- *                     bing:
- *                       type: object
- *                     duckduckgo:
- *                       type: object
- */
 // Scraper unificado - busca em todos os motores
 app.get('/api/scrape/all-engines', async (req, res) => {
   try {
@@ -823,34 +445,6 @@ app.get('/api/scrape/all-engines', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/scrape/multi-source:
- *   get:
- *     summary: Buscar em múltiplas fontes personalizadas
- *     tags: [Multi-Fonte]
- *     parameters:
- *       - in: query
- *         name: query
- *         required: true
- *         schema:
- *           type: string
- *       - in: query
- *         name: sources
- *         schema:
- *           type: string
- *           default: "google"
- *         description: Fontes separadas por vírgula
- *         example: "wikipedia,unsplash,pexels"
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *     responses:
- *       200:
- *         description: Resultados de múltiplas fontes
- */
 // Scraper multi-fonte
 app.get('/api/scrape/multi-source', async (req, res) => {
   try {
@@ -912,25 +506,6 @@ app.get('/api/scrape/multi-source', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/knowledge-base/{name}:
- *   delete:
- *     summary: Remover uma base de conhecimento
- *     tags: [Bases de Conhecimento]
- *     parameters:
- *       - in: path
- *         name: name
- *         required: true
- *         schema:
- *           type: string
- *         description: Nome da base a ser removida
- *     responses:
- *       200:
- *         description: Base removida com sucesso
- *       404:
- *         description: Base não encontrada
- */
 // Remover base de conhecimento
 app.delete('/api/knowledge-base/:name', (req, res) => {
   const { name } = req.params;
@@ -948,29 +523,6 @@ app.delete('/api/knowledge-base/:name', (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/health:
- *   get:
- *     summary: Verificar status da API
- *     tags: [Sistema]
- *     responses:
- *       200:
- *         description: Status da API
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: "ok"
- *                 timestamp:
- *                   type: string
- *                   format: date-time
- *                 knowledgeBasesCount:
- *                   type: integer
- */
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
@@ -980,25 +532,22 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-const host = process.env.HOST || 'localhost';
-const port = process.env.PORT || 3000;
-
-app.listen(port, host, () => {
-  console.log(`🚀 API de Web Scraper rodando em http://${host}:${port}`);
-  console.log(`\n📖 Documentação Swagger disponível em: http://${host}/api-docs`);
-  console.log(`📄 JSON da API: http://${host}/api-docs.json`);
+const PORT = process.env.PORT || 3000;
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+app.listen(PORT, () => {
+  console.log(`🚀 API de Web Scraper rodando na porta ${PORT}`);
   console.log(`\n📍 Endpoints disponíveis:\n`);
   console.log(`🔍 Motores de Busca:`);
-  console.log(`   GET  http://${host}/api/scrape/google-images?query=gatos&page=1&limit=20`);
-  console.log(`   GET  http://${host}/api/scrape/bing-images?query=gatos&page=1&limit=20`);
-  console.log(`   GET  http://${host}/api/scrape/duckduckgo-images?query=gatos&page=1&limit=20`);
-  console.log(`   GET  http://${host}/api/scrape/all-engines?query=gatos&limit=10`);
+  console.log(`   GET  ${BASE_URL}/api/scrape/google-images?query=gatos&page=1&limit=20`);
+  console.log(`   GET  ${BASE_URL}/api/scrape/bing-images?query=gatos&page=1&limit=20`);
+  console.log(`   GET  ${BASE_URL}/api/scrape/duckduckgo-images?query=gatos&page=1&limit=20`);
+  console.log(`   GET  ${BASE_URL}/api/scrape/all-engines?query=gatos&limit=10`);
   console.log(`\n📚 Bases de Conhecimento:`);
-  console.log(`   GET  http://${host}/api/scrape/knowledge-base/:baseName?query=exemplo`);
-  console.log(`   GET  http://${host}/api/scrape/multi-source?query=exemplo&sources=wikipedia,unsplash`);
-  console.log(`   GET  http://${host}/api/knowledge-bases`);
-  console.log(`   POST http://${host}/api/knowledge-base`);
-  console.log(`   DELETE http://${host}/api/knowledge-base/:name`);
+  console.log(`   GET  ${BASE_URL}/api/scrape/knowledge-base/:baseName?query=exemplo`);
+  console.log(`   GET  ${BASE_URL}/api/scrape/multi-source?query=exemplo&sources=wikipedia,unsplash`);
+  console.log(`   GET  ${BASE_URL}/api/knowledge-bases`);
+  console.log(`   POST ${BASE_URL}/api/knowledge-base`);
+  console.log(`   DELETE ${BASE_URL}/api/knowledge-base/:name`);
   console.log(`\n💡 Suporte para: Google, Bing, DuckDuckGo + bases personalizadas`);
 });
 
