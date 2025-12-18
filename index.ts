@@ -195,6 +195,90 @@ function paginate<T>(items: T[], page: number, limit: number) {
 
 const unique = <T,>(arr: T[]) => [...new Set(arr)]
 
+
+async function scrapeEngine(
+  engine: string,
+  query: string,
+  page = 1,
+  limit = 20
+) {
+  const template = knowledgeBases.get(engine)
+  if (!template) throw new Error(`Engine inválida: ${engine}`)
+
+  const url = buildUrl(template, query, page)
+  const { data } = await http.get(url)
+
+  const $ = cheerio.load(data)
+
+  const urls = unique(
+    $('img')
+      .map((_, el) => {
+        const $el = $(el)
+
+        const raw =
+          $el.attr('src') ||
+          $el.attr('data-src') ||
+          $el.attr('data-lazy')
+
+        if (!raw) return null
+        if (raw.startsWith('data:image')) return null
+
+        const normalized = normalizeImageUrl(raw, url)
+        if (!normalized) return null
+
+        if (isSystemImage(normalized, $el)) return null
+
+        return normalized
+      })
+      .get()
+      .filter(Boolean)
+  )
+
+  const { data: images, pagination } = paginate(urls, page, limit)
+
+  return {
+    engine,
+    url,
+    images: images.map((url, i) => ({
+      id: i + 1,
+      url,
+      thumbnail: url,
+      source: engine
+    })),
+    pagination
+  }
+}
+async function parallelScrape(
+  engines: string[],
+  query: string,
+  page = 1,
+  limit = 20,
+  concurrency = 3
+) {
+  const results: any[] = []
+  const queue = [...engines]
+
+  const workers = Array.from({ length: concurrency }).map(async () => {
+    while (queue.length) {
+      const engine = queue.shift()
+      if (!engine) return
+
+      try {
+        const result = await scrapeEngine(engine, query, page, limit)
+        results.push(result)
+      } catch (err: any) {
+        results.push({
+          engine,
+          error: err.message ?? 'Erro desconhecido'
+        })
+      }
+    }
+  })
+
+  await Promise.all(workers)
+  return results
+}
+
 // =============================
 // App
 // =============================
@@ -336,6 +420,42 @@ const app = new Elysia()
       }),
       query: t.Object({
         query: t.String(),
+        page: t.Optional(t.String()),
+        limit: t.Optional(t.String())
+      })
+    }
+  )
+  .get(
+    '/api/scrape/all',
+    async ({ query }) => {
+      const engines = query.engines
+        ? query.engines.split(',').map(e => e.trim())
+        : [...knowledgeBases.keys()]
+  
+      const page = Number(query.page ?? 1)
+      const limit = Number(query.limit ?? 10)
+  
+      const results = await parallelScrape(
+        engines,
+        query.query,
+        page,
+        limit,
+        4 // concorrência
+      )
+  
+      return {
+        query: query.query,
+        engines,
+        totalEngines: engines.length,
+        success: results.filter(r => !r.error).length,
+        failed: results.filter(r => r.error).length,
+        results
+      }
+    },
+    {
+      query: t.Object({
+        query: t.String(),
+        engines: t.Optional(t.String()),
         page: t.Optional(t.String()),
         limit: t.Optional(t.String())
       })
