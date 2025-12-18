@@ -50,14 +50,6 @@ const knowledgeBases = new Map<string, string>([
   ['pexels', 'https://www.pexels.com/search/'],
   ['flickr', 'https://www.flickr.com/search/?text='],
   ['pixabay', 'https://pixabay.com/images/search/'],
-  ['google', 'https://www.google.com/search?q='],
-  ['bing', 'https://www.bing.com/images/search?q='],
-  ['duckduckgo', 'https://www.duckduckgo.com/images?q='],
-  ['yahoo', 'https://search.yahoo.com/search?p='],
-  ['ask', 'https://www.ask.com/web?q='],
-  ['yandex', 'https://yandex.ru/images/search?text='],
-  ['baidu', 'https://image.baidu.com/search/index?tn=baiduimage&word='],
-  ['yahoo', 'https://search.yahoo.com/search?p='],
 ]);
 
 // =============================
@@ -110,29 +102,7 @@ const app = new Elysia()
   // =============================
   // Sistema
   // =============================
-  .get('/', () => ({
-    name: 'API de Web Scraper de Imagens',
-    version: '2.0.0',
-    description: 'Scraping de imagens com múltiplas fontes',
-    baseUrl: BASE_URL,
-    documentation: `${BASE_URL}/swagger`,
-    endpoints: {
-      search_engines: [
-        `${BASE_URL}/api/scrape/google-images?query=gato&limit=10`,
-        `${BASE_URL}/api/scrape/bing-images?query=gato&limit=10`,
-      ],
-      knowledge_bases: [
-        `${BASE_URL}/api/knowledge-bases`,
-        `${BASE_URL}/api/knowledge-base`,
-        `${BASE_URL}/api/scrape/knowledge-base/:baseName?query=tech`,
-      ],
-    },
-  }))
 
-
-  // =============================
-  // Health Check
-  // =============================
   .get('/api/health', () => ({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -258,6 +228,138 @@ const app = new Elysia()
           hasNextPage: images.length >= limit,
           nextPage: page + 1,
         },
+      };
+    },
+    {
+      query: t.Object({
+        query: t.String(),
+        page: t.Optional(t.String()),
+        limit: t.Optional(t.String()),
+      }),
+    },
+  )
+
+  // =============================
+  // DuckDuckGo Images
+  // =============================
+
+  .get(
+    '/api/scrape/duckduckgo-images',
+    async ({ query }) => {
+      const page = Number(query.page ?? 1);
+      const limit = Number(query.limit ?? 20);
+
+      const searchUrl = `https://duckduckgo.com/?q=${encodeURIComponent(query.query)}&iax=images&ia=images`;
+      const { data } = await http.get(searchUrl);
+      const $ = cheerio.load(data);
+
+      const urls = unique(
+        $('img')
+          .map((_, el) => $(el).attr('src') || $(el).attr('data-src'))
+          .get()
+          .filter(src => src?.startsWith('http')) as string[],
+      );
+
+      const { data: images, pagination } = paginate(urls, page, limit);
+
+      return {
+        engine: 'duckduckgo',
+        query: query.query,
+        images: images.map((url, i) => ({
+          id: i + 1,
+          url,
+          thumbnail: url,
+          source: 'duckduckgo',
+        })),
+        pagination,
+      };
+    },
+    {
+      query: t.Object({
+        query: t.String(),
+        page: t.Optional(t.String()),
+        limit: t.Optional(t.String()),
+      }),
+    },
+  )
+
+  // =============================
+  // Yandex Images
+  // =============================
+
+  .get(
+    '/api/scrape/yandex-images',
+    async ({ query }) => {
+      const page = Number(query.page ?? 1);
+      const limit = Number(query.limit ?? 20);
+
+      const url = `https://yandex.com/images/search?text=${encodeURIComponent(query.query)}`;
+      const { data } = await http.get(url);
+      const $ = cheerio.load(data);
+
+      const urls = unique(
+        $('img')
+          .map((_, el) => $(el).attr('src'))
+          .get()
+          .filter(src => src?.startsWith('http')) as string[],
+      );
+
+      const { data: images, pagination } = paginate(urls, page, limit);
+
+      return {
+        engine: 'yandex',
+        query: query.query,
+        images: images.map((url, i) => ({
+          id: i + 1,
+          url,
+          thumbnail: url,
+          source: 'yandex',
+        })),
+        pagination,
+      };
+    },
+    {
+      query: t.Object({
+        query: t.String(),
+        page: t.Optional(t.String()),
+        limit: t.Optional(t.String()),
+      }),
+    },
+  )
+
+  // =============================
+  // Brave Images
+  // =============================
+
+  .get(
+    '/api/scrape/brave-images',
+    async ({ query }) => {
+      const page = Number(query.page ?? 1);
+      const limit = Number(query.limit ?? 20);
+
+      const url = `https://search.brave.com/images?q=${encodeURIComponent(query.query)}`;
+      const { data } = await http.get(url);
+      const $ = cheerio.load(data);
+
+      const urls = unique(
+        $('img')
+          .map((_, el) => $(el).attr('src'))
+          .get()
+          .filter(src => src?.startsWith('http')) as string[],
+      );
+
+      const { data: images, pagination } = paginate(urls, page, limit);
+
+      return {
+        engine: 'brave',
+        query: query.query,
+        images: images.map((url, i) => ({
+          id: i + 1,
+          url,
+          thumbnail: url,
+          source: 'brave',
+        })),
+        pagination,
       };
     },
     {
