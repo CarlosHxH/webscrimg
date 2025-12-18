@@ -20,4 +20,4 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 # Comando de inicialização
-CMD ["bun", "run", "src/index.ts"]
+CMD ["bun", "run", "index.ts"]
