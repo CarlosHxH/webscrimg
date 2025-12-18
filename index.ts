@@ -50,6 +50,15 @@ const knowledgeBases = new Map<string, string>([
   ['pexels', 'https://www.pexels.com/search/'],
   ['flickr', 'https://www.flickr.com/search/?text='],
   ['pixabay', 'https://pixabay.com/images/search/'],
+  ['imgur', 'https://imgur.com/search?q='],
+  ['brave', 'https://search.brave.com/images?q='],
+  ['yahoo', 'https://search.yahoo.com/search?p='],
+  ['ask', 'https://www.ask.com/web?q='],
+  ['yandex', 'https://yandex.ru/images/search?text='],
+  ['baidu', 'https://image.baidu.com/search/index?tn=baiduimage&word='],
+  ['google', 'https://www.google.com/search?q='],
+  ['bing', 'https://www.bing.com/images/search?q='],
+  ['duckduckgo', 'https://www.duckduckgo.com/images?q='],
 ]);
 
 // =============================
@@ -98,6 +107,45 @@ const app = new Elysia()
     const { method, url } = request;
     console.log(`[${new Date().toISOString()}] ${method} ${new URL(url).pathname}`);
   })
+
+  .get('/', () => ({
+    message: 'API de Web Scraper de Imagens',
+    version: '2.0.0',
+    description: 'Scraping de imagens com múltiplas fontes',
+    baseUrl: BASE_URL,
+    documentation: `${BASE_URL}/swagger`,
+    endpoints: {
+      search_engines: [
+        `${BASE_URL}/api/scrape/google-images`,
+        `${BASE_URL}/api/scrape/bing-images`,
+        `${BASE_URL}/api/scrape/duckduckgo-images`,
+        `${BASE_URL}/api/scrape/yandex-images`,
+        `${BASE_URL}/api/scrape/brave-images`,
+      ],
+    },
+    usage_examples: [
+      {
+        description: 'Buscar imagens no Google',
+        url: `${BASE_URL}/api/scrape/google-images?query=gato&limit=10`,
+      },
+      {
+        description: 'Buscar imagens no Bing',
+        url: `${BASE_URL}/api/scrape/bing-images?query=gato&limit=10`,
+      },
+      {
+        description: 'Buscar imagens no DuckDuckGo',
+        url: `${BASE_URL}/api/scrape/duckduckgo-images?query=gato&limit=10`,
+      },
+      {
+        description: 'Buscar imagens no Yandex',
+        url: `${BASE_URL}/api/scrape/yandex-images?query=gato&limit=10`,
+      },
+      {
+        description: 'Buscar imagens no Brave',
+        url: `${BASE_URL}/api/scrape/brave-images?query=gato&limit=10`,
+      },
+    ],
+  }))
 
   // =============================
   // Sistema

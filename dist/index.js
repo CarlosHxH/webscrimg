@@ -61088,6 +61088,81 @@ var app = new Elysia().use(cors({ origin: "*", methods: ["GET", "POST", "DELETE"
     page: t.Optional(t.String()),
     limit: t.Optional(t.String())
   })
+}).get("/api/scrape/duckduckgo-images", async ({ query }) => {
+  const page = Number(query.page ?? 1);
+  const limit = Number(query.limit ?? 20);
+  const searchUrl = `https://duckduckgo.com/?q=${encodeURIComponent(query.query)}&iax=images&ia=images`;
+  const { data: data2 } = await http3.get(searchUrl);
+  const $3 = load(data2);
+  const urls = unique($3("img").map((_2, el) => $3(el).attr("src") || $3(el).attr("data-src")).get().filter((src) => src?.startsWith("http")));
+  const { data: images, pagination } = paginate(urls, page, limit);
+  return {
+    engine: "duckduckgo",
+    query: query.query,
+    images: images.map((url3, i) => ({
+      id: i + 1,
+      url: url3,
+      thumbnail: url3,
+      source: "duckduckgo"
+    })),
+    pagination
+  };
+}, {
+  query: t.Object({
+    query: t.String(),
+    page: t.Optional(t.String()),
+    limit: t.Optional(t.String())
+  })
+}).get("/api/scrape/yandex-images", async ({ query }) => {
+  const page = Number(query.page ?? 1);
+  const limit = Number(query.limit ?? 20);
+  const url3 = `https://yandex.com/images/search?text=${encodeURIComponent(query.query)}`;
+  const { data: data2 } = await http3.get(url3);
+  const $3 = load(data2);
+  const urls = unique($3("img").map((_2, el) => $3(el).attr("src")).get().filter((src) => src?.startsWith("http")));
+  const { data: images, pagination } = paginate(urls, page, limit);
+  return {
+    engine: "yandex",
+    query: query.query,
+    images: images.map((url4, i) => ({
+      id: i + 1,
+      url: url4,
+      thumbnail: url4,
+      source: "yandex"
+    })),
+    pagination
+  };
+}, {
+  query: t.Object({
+    query: t.String(),
+    page: t.Optional(t.String()),
+    limit: t.Optional(t.String())
+  })
+}).get("/api/scrape/brave-images", async ({ query }) => {
+  const page = Number(query.page ?? 1);
+  const limit = Number(query.limit ?? 20);
+  const url3 = `https://search.brave.com/images?q=${encodeURIComponent(query.query)}`;
+  const { data: data2 } = await http3.get(url3);
+  const $3 = load(data2);
+  const urls = unique($3("img").map((_2, el) => $3(el).attr("src")).get().filter((src) => src?.startsWith("http")));
+  const { data: images, pagination } = paginate(urls, page, limit);
+  return {
+    engine: "brave",
+    query: query.query,
+    images: images.map((url4, i) => ({
+      id: i + 1,
+      url: url4,
+      thumbnail: url4,
+      source: "brave"
+    })),
+    pagination
+  };
+}, {
+  query: t.Object({
+    query: t.String(),
+    page: t.Optional(t.String()),
+    limit: t.Optional(t.String())
+  })
 }).get("/api/scrape/knowledge-base/:name", async ({ params, query }) => {
   const baseUrl = knowledgeBases.get(params.name);
   if (!baseUrl)
