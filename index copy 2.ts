@@ -63,68 +63,106 @@ const knowledgeBases = new Map<string, string>([
   ['jocar', 'https://www.jocar.com.br/{query}']
 ])
 
-// =============================
-// Filtros
-// =============================
+const BLOCKED_EXTENSIONS = [
+  '.svg',
+  '.ico'
+]
 
-function isTrackingPixel(url: string) {
-  return (
-    url.startsWith('data:image') &&
-    (url.length < 200 || url.includes('AAAAEAAAAB'))
-  )
+function isBase64Image(url: string) {
+  return url.startsWith('data:image')
 }
 
 function isTooSmall(url: string) {
-  const w = url.match(/[?&]w=(\d+)/i)?.[1]
-  const h = url.match(/[?&]h=(\d+)/i)?.[1]
-  return (w && Number(w) < 100) || (h && Number(h) < 100)
+  const matchW = url.match(/[?&]w=(\d+)/i)
+  const matchH = url.match(/[?&]h=(\d+)/i)
+
+  const w = matchW ? Number(matchW[1]) : null
+  const h = matchH ? Number(matchH[1]) : null
+
+  if (w !== null && w < 100) return true
+  if (h !== null && h < 100) return true
+
+  return false
 }
 
-function isSystemImage(url: string, $el?: cheerio.Cheerio<any>) {
-  const u = url.toLowerCase()
+function isSystemImage(
+  url: string,
+  $el?: cheerio.Cheerio<any>
+): boolean {
+  const lowerUrl = url.toLowerCase()
 
-  if (isTrackingPixel(u)) return true
-  if (u.endsWith('.svg') || u.endsWith('.ico') || u.endsWith('.gif')) return true
-  if (isTooSmall(u)) return true
+  // ❌ base64 (placeholder)
+  if (lowerUrl.startsWith('data:image')) {
+    return true
+  }
 
+  // ❌ extensões ruins
+  if (lowerUrl.endsWith('.svg') || lowerUrl.endsWith('.ico')) {
+    return true
+  }
+
+  // ❌ paths de sistema
   const blocked = [
     'logo',
     'icon',
+    'icons',
     'sprite',
-    'favicon',
-    'flag',
-    'flags',
-    '_next',
-    'static',
-    'assets',
-    'branding',
+    'ui',
     'header',
     'footer',
     'menu',
     'navbar',
-    'mm.bing.net'
+    'brand',
+    'branding',
+    'flag',
+    'flags',
+    'region',
+    'regions',
+    '_next',
+    'static',
+    'assets',
+    'favicon',
+    'gif'
   ]
 
-  if (blocked.some(k => u.includes(k))) return true
+  if (blocked.some(k => lowerUrl.includes(k))) {
+    return true
+  }
+
+  // ❌ imagens muito pequenas (query string)
+  if (isTooSmall(lowerUrl)) {
+    return true
+  }
 
   if ($el) {
     const cls = ($el.attr('class') || '').toLowerCase()
     const alt = ($el.attr('alt') || '').toLowerCase()
-    if (cls.includes('logo') || alt.includes('logo')) return true
+    const role = ($el.attr('role') || '').toLowerCase()
+
+    if (
+      cls.includes('logo') ||
+      cls.includes('icon') ||
+      alt.includes('logo') ||
+      role === 'presentation'
+    ) {
+      return true
+    }
   }
 
   return false
 }
 
-// =============================
-// Helpers
-// =============================
 
-function buildUrl(template: string, query: string, page: number) {
+function buildUrl(
+  template: string,
+  query: string,
+  page: number
+) {
   return template
     .replace('{query}', encodeURIComponent(query))
     .replace('{page}', String(page))
 }
+
 
 function normalizeImageUrl(src: string, base: string) {
   if (src.startsWith('//')) return 'https:' + src
@@ -136,8 +174,14 @@ function normalizeImageUrl(src: string, base: string) {
   }
 }
 
+
+// =============================
+// Utils
+// =============================
+
 function paginate<T>(items: T[], page: number, limit: number) {
   const start = (page - 1) * limit
+
   return {
     data: items.slice(start, start + limit),
     pagination: {
@@ -151,9 +195,6 @@ function paginate<T>(items: T[], page: number, limit: number) {
 
 const unique = <T,>(arr: T[]) => [...new Set(arr)]
 
-// =============================
-// Scraper
-// =============================
 
 async function scrapeEngine(
   engine: string,
@@ -166,22 +207,25 @@ async function scrapeEngine(
 
   const url = buildUrl(template, query, page)
   const { data } = await http.get(url)
+
   const $ = cheerio.load(data)
 
   const urls = unique(
     $('img')
       .map((_, el) => {
         const $el = $(el)
+
         const raw =
           $el.attr('src') ||
           $el.attr('data-src') ||
           $el.attr('data-lazy')
 
         if (!raw) return null
-        if (isTrackingPixel(raw)) return null
+        if (raw.startsWith('data:image')) return null
 
         const normalized = normalizeImageUrl(raw, url)
         if (!normalized) return null
+
         if (isSystemImage(normalized, $el)) return null
 
         return normalized
@@ -204,25 +248,35 @@ async function scrapeEngine(
     pagination
   }
 }
-
-// =============================
-// Paralelo
-// =============================
-
 async function parallelScrape(
   engines: string[],
   query: string,
   page = 1,
-  limit = 20
+  limit = 20,
+  concurrency = 3
 ) {
-  return Promise.all(
-    engines.map(engine =>
-      scrapeEngine(engine, query, page, limit).catch(err => ({
-        engine,
-        error: err.message ?? 'Erro'
-      }))
-    )
-  )
+  const results: any[] = []
+  const queue = [...engines]
+
+  const workers = Array.from({ length: concurrency }).map(async () => {
+    while (queue.length) {
+      const engine = queue.shift()
+      if (!engine) return
+
+      try {
+        const result = await scrapeEngine(engine, query, page, limit)
+        results.push(result)
+      } catch (err: any) {
+        results.push({
+          engine,
+          error: err.message ?? 'Erro desconhecido'
+        })
+      }
+    }
+  })
+
+  await Promise.all(workers)
+  return results
 }
 
 // =============================
@@ -243,28 +297,127 @@ const app = new Elysia()
     })
   )
 
+  // =============================
+  // Middleware Log
+  // =============================
+  .onRequest(({ request }) => {
+    console.log(
+      `[${new Date().toISOString()}] ${request.method} ${new URL(request.url).pathname}`
+    )
+  })
+
   .get('/', () => ({
-    message: 'API Web Scraper de Imagens',
+    message: 'API de Web Scraper de Imagens',
     version: '2.0.0',
-    engines: [...knowledgeBases.keys()],
-    docs: `${BASE_URL}/swagger`
+    description: 'Scraping de imagens com múltiplas fontes',
+    baseUrl: BASE_URL,
+    documentation: `${BASE_URL}/swagger`,
+    //endpoints: {search_engines: [...knowledgeBases.keys()].map(engine => `${BASE_URL}/api/scrape/${engine}`)},
+    engines: [...knowledgeBases.keys()].map((engine: string) => engine),
+    usage_examples: {
+      description: `Buscar imagens`,
+      url: `${BASE_URL}/api/scrape/google?query=gato&limit=10`,
+      parameters: {
+        query: 'gato',
+        limit: '10'
+      }
+    }
   }))
 
+  // =============================
+  // Health
+  // =============================
   .get('/api/health', () => ({
     status: 'ok',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    knowledgeBases: knowledgeBases.size
   }))
 
+  // =============================
+  // Knowledge Bases
+  // =============================
+  .get('/api/knowledge-bases', () => ({
+    data: [...knowledgeBases.entries()].map(([name, url]) => ({ name, url }))
+  }))
+
+  .post(
+    '/api/knowledge-base',
+    ({ body }) => {
+      knowledgeBases.set(body.name, body.baseUrl)
+      return { message: 'Base adicionada', ...body }
+    },
+    {
+      body: t.Object({
+        name: t.String(),
+        baseUrl: t.String()
+      })
+    }
+  )
+
+  // =============================
+  // Scraper Genérico
+  // =============================
   .get(
     '/api/scrape/:engine',
-    async ({ params, query }) =>
-      scrapeEngine(
-        params.engine,
-        query.query,
-        Number(query.page ?? 1),
-        Number(query.limit ?? 20)
-      ),
+    async ({ params, query }) => {
+      const template = knowledgeBases.get(params.engine)
+      if (!template) throw new Error('Engine não encontrada')
+  
+      const page = Number(query.page ?? 1)
+      const limit = Number(query.limit ?? 20)
+  
+      const url = buildUrl(template, query.query, page)
+  
+      const { data } = await http.get(url)
+      const $ = cheerio.load(data)
+  
+      const urls = unique(
+        $('img')
+          .map((_, el) => {
+            const $el = $(el)
+      
+            const raw =
+              $el.attr('src') ||
+              $el.attr('data-src') ||
+              $el.attr('data-lazy')
+      
+            if (!raw) return null
+      
+            // ❌ corta base64 na origem
+            if (raw.startsWith('data:image')) return null
+      
+            const normalized = normalizeImageUrl(raw, url)
+            if (!normalized) return null
+      
+            if (isSystemImage(normalized, $el)) return null
+      
+            return normalized
+          })
+          .get()
+          .filter(Boolean)
+      )
+      
+      
+  
+      const { data: images, pagination } = paginate(urls, page, limit)
+  
+      return {
+        engine: params.engine,
+        query: query.query,
+        url,
+        images: images.map((url, i): ImageResult => ({
+          id: i + 1,
+          url,
+          thumbnail: url,
+          source: params.engine
+        })),
+        pagination
+      }
+    },
     {
+      params: t.Object({
+        engine: t.String()
+      }),
       query: t.Object({
         query: t.String(),
         page: t.Optional(t.String()),
@@ -272,23 +425,31 @@ const app = new Elysia()
       })
     }
   )
-
   .get(
     '/api/scrape/all',
     async ({ query }) => {
       const engines = query.engines
         ? query.engines.split(',').map(e => e.trim())
         : [...knowledgeBases.keys()]
-
+  
+      const page = Number(query.page ?? 1)
+      const limit = Number(query.limit ?? 10)
+  
+      const results = await parallelScrape(
+        engines,
+        query.query,
+        page,
+        limit,
+        4 // concorrência
+      )
+  
       return {
         query: query.query,
         engines,
-        results: await parallelScrape(
-          engines,
-          query.query,
-          Number(query.page ?? 1),
-          Number(query.limit ?? 20)
-        )
+        totalEngines: engines.length,
+        success: results.filter(r => !r.error).length,
+        failed: results.filter(r => r.error).length,
+        results
       }
     },
     {
@@ -300,6 +461,7 @@ const app = new Elysia()
       })
     }
   )
+  
 
   .listen(PORT)
 
