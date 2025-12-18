@@ -1,111 +1,247 @@
-// =============================
-// API Web Scraper de Imagens
-// Stack: Elysia + TypeScript
-// =============================
-
-import { Elysia, t } from 'elysia';
-import { swagger } from '@elysiajs/swagger';
-import { cors } from '@elysiajs/cors';
-import openapi from '@elysiajs/openapi';
-import axios, { AxiosInstance } from 'axios';
-import * as cheerio from 'cheerio';
+import { Elysia, t } from 'elysia'
+import { swagger } from '@elysiajs/swagger'
+import { cors } from '@elysiajs/cors'
+import axios from 'axios'
+import * as cheerio from 'cheerio'
 
 // =============================
-// Configurações Gerais
+// Configurações
 // =============================
 
-const PORT = Number(process.env.PORT ?? 3000);
-const BASE_URL = process.env.BASE_URL ?? `http://localhost:${PORT}`;
+const PORT = Number(process.env.PORT ?? 3000)
+const BASE_URL = `http://localhost:${PORT}`
 
-const http: AxiosInstance = axios.create({
+const http = axios.create({
   timeout: 15000,
   headers: {
     'User-Agent':
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-    'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-  },
-});
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'
+  }
+})
 
 // =============================
 // Tipos
 // =============================
 
 type ImageResult = {
-  id: number;
-  url: string;
-  thumbnail?: string;
-  title?: string;
-  width?: number;
-  height?: number;
-  source: string;
-};
+  id: number
+  url: string
+  thumbnail?: string
+  title?: string
+  width?: number
+  height?: number
+  source: string
+}
 
 // =============================
 // Bases de Conhecimento
 // =============================
 
 const knowledgeBases = new Map<string, string>([
-  ['wikipedia', 'https://pt.wikipedia.org/wiki/'],
-  ['unsplash', 'https://unsplash.com/s/photos/'],
-  ['pexels', 'https://www.pexels.com/search/'],
-  ['flickr', 'https://www.flickr.com/search/?text='],
-  ['pixabay', 'https://pixabay.com/images/search/'],
-  ['imgur', 'https://imgur.com/search?q='],
-  ['brave', 'https://search.brave.com/images?q='],
-  ['yahoo', 'https://search.yahoo.com/search?p='],
-  ['ask', 'https://www.ask.com/web?q='],
-  ['yandex', 'https://yandex.ru/images/search?text='],
-  ['baidu', 'https://image.baidu.com/search/index?tn=baiduimage&word='],
-  ['google', 'https://www.google.com/search?q='],
-  ['bing', 'https://www.bing.com/images/search?q='],
-  ['duckduckgo', 'https://www.duckduckgo.com/images?q='],
-]);
+  ['wikipedia', 'https://pt.wikipedia.org/wiki/{query}'],
+  ['unsplash', 'https://unsplash.com/s/photos/{query}'],
+  ['pexels', 'https://www.pexels.com/search/{query}'],
+  ['pixabay', 'https://pixabay.com/images/search/{query}'],
+  ['bing', 'https://www.bing.com/images/search?q={query}'],
+  ['duckduckgo', 'https://duckduckgo.com/?q={query}'],
+  ['brave', 'https://search.brave.com/images?q={query}'],
+  ['gaprisa', 'https://www.gaprisa.com.br/catalogsearch/result/?q={query}'],
+  ['google', 'https://www.google.com/search?q={query}&tbm=isch'],
+  ['autoexperts', 'https://www.autoexperts.parts/pt/br/search?q={query}'],
+  ['cuiaba', 'https://www.cuiabadistribuidora.com.br/produtos/bp.asp?busca={query}'],
+  ['alagoas', 'https://www.alagoasdistribuidora.com.br/produtos/bp.asp?busca={query}'],
+  ['bahia', 'https://www.bahiadistribuidora.com.br/produtos/bp.asp?busca={query}'],
+  ['ceara', 'https://www.cearadistribuidora.com.br/produtos/bp.asp?busca={query}'],
+  ['espirito-santo', 'https://www.espiritosantodistribuidora.com.br/produtos/bp.asp?busca={query}'],
+  ['goias', 'https://www.goiasedistribuidora.com.br/produtos/bp.asp?busca={query}'],
+  ['maranhao', 'https://www.maranhaodistribuidora.com.br/produtos/bp.asp?busca={query}'],
+  ['mato-grosso', 'https://www.matogrossodistribuidora.com.br/produtos/bp.asp?busca={query}'],
+  ['mato-grosso-do-sul', 'https://www.matogrossodosuldistribuidora.com.br/produtos/bp.asp?busca={query}'],
+  ['hipervarejo', 'https://www.hipervarejo.com.br/search?paged={page}&q={query}'],
+  ['jbs', 'https://www.jbs.com.br/produtos/bp.asp?busca={query}'],
+  ['jocar', 'https://www.jocar.com.br/{query}']
+])
+
+const BLOCKED_EXTENSIONS = [
+  '.svg',
+  '.ico'
+]
+
+function isBase64Image(url: string) {
+  return url.startsWith('data:image')
+}
+
+function isTooSmall(url: string) {
+  const matchW = url.match(/[?&]w=(\d+)/i)
+  const matchH = url.match(/[?&]h=(\d+)/i)
+
+  const w = matchW ? Number(matchW[1]) : null
+  const h = matchH ? Number(matchH[1]) : null
+
+  if (w !== null && w < 100) return true
+  if (h !== null && h < 100) return true
+
+  return false
+}
+
+function isSystemImage(
+  url: string,
+  $el?: cheerio.Cheerio<any>
+): boolean {
+  const lowerUrl = url.toLowerCase()
+
+  // ❌ base64 (placeholder)
+  if (lowerUrl.startsWith('data:image')) {
+    return true
+  }
+
+  // ❌ extensões ruins
+  if (lowerUrl.endsWith('.svg') || lowerUrl.endsWith('.ico')) {
+    return true
+  }
+
+  // ❌ paths de sistema
+  const blocked = [
+    'logo',
+    'icon',
+    'icons',
+    'sprite',
+    'ui',
+    'header',
+    'footer',
+    'menu',
+    'navbar',
+    'brand',
+    'branding',
+    'flag',
+    'flags',
+    'region',
+    'regions',
+    '_next',
+    'static',
+    'assets',
+    'favicon'
+  ]
+
+  if (blocked.some(k => lowerUrl.includes(k))) {
+    return true
+  }
+
+  // ❌ imagens muito pequenas (query string)
+  if (isTooSmall(lowerUrl)) {
+    return true
+  }
+
+  if ($el) {
+    const cls = ($el.attr('class') || '').toLowerCase()
+    const alt = ($el.attr('alt') || '').toLowerCase()
+    const role = ($el.attr('role') || '').toLowerCase()
+
+    if (
+      cls.includes('logo') ||
+      cls.includes('icon') ||
+      alt.includes('logo') ||
+      role === 'presentation'
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+
+function buildUrl(
+  template: string,
+  query: string,
+  page: number
+) {
+  return template
+    .replace('{query}', encodeURIComponent(query))
+    .replace('{page}', String(page))
+}
+
+
+function normalizeImageUrl(src: string, base: string) {
+  if (src.startsWith('//')) return 'https:' + src
+  if (src.startsWith('http')) return src
+  try {
+    return new URL(src, base).href
+  } catch {
+    return null
+  }
+}
+
+const BLOCKED_PATH_KEYWORDS = [
+  'logo',
+  'logos',
+  'icon',
+  'icons',
+  'sprite',
+  'ui',
+  'header',
+  'footer',
+  'menu',
+  'navbar',
+  'brand',
+  'branding',
+  'flag',
+  'flags',
+  'region',
+  'regions',
+  '_next',
+  'static',
+  'assets',
+  'favicon'
+]
+
 
 // =============================
-// Utilitários
+// Utils
 // =============================
 
 function paginate<T>(items: T[], page: number, limit: number) {
-  const start = (page - 1) * limit;
+  const start = (page - 1) * limit
+
   return {
     data: items.slice(start, start + limit),
     pagination: {
       currentPage: page,
       hasNextPage: start + limit < items.length,
       nextPage: page + 1,
-      total: items.length,
-    },
-  };
+      total: items.length
+    }
+  }
 }
 
-function unique<T>(array: T[]): T[] {
-  return [...new Set(array)];
-}
+const unique = <T,>(arr: T[]) => [...new Set(arr)]
 
 // =============================
 // App
 // =============================
 
 const app = new Elysia()
-  .use(cors({ origin: '*', methods: ['GET', 'POST', 'DELETE'] }))
-  .use(openapi({
-    documentation: {
-      info: {
-        title: 'API de Web Scraper de Imagens',
-        version: '2.0.0',
-        description: 'Scraping de imagens com múltiplas fontes',
-      },
-      servers: [{ url: BASE_URL }],
-    },
-  }))
-  .use(swagger())
+  .use(cors({ origin: '*' }))
+  .use(
+    swagger({
+      documentation: {
+        info: {
+          title: 'API Web Scraper de Imagens',
+          version: '2.0.0'
+        },
+        servers: [{ url: BASE_URL }]
+      }
+    })
+  )
 
   // =============================
-  // Middleware de Log
+  // Middleware Log
   // =============================
   .onRequest(({ request }) => {
-    const { method, url } = request;
-    console.log(`[${new Date().toISOString()}] ${method} ${new URL(url).pathname}`);
+    console.log(
+      `[${new Date().toISOString()}] ${request.method} ${new URL(request.url).pathname}`
+    )
   })
 
   .get('/', () => ({
@@ -114,357 +250,121 @@ const app = new Elysia()
     description: 'Scraping de imagens com múltiplas fontes',
     baseUrl: BASE_URL,
     documentation: `${BASE_URL}/swagger`,
-    endpoints: {
-      search_engines: [
-        `${BASE_URL}/api/scrape/google-images`,
-        `${BASE_URL}/api/scrape/bing-images`,
-        `${BASE_URL}/api/scrape/duckduckgo-images`,
-        `${BASE_URL}/api/scrape/yandex-images`,
-        `${BASE_URL}/api/scrape/brave-images`,
-      ],
-    },
-    usage_examples: [
-      {
-        description: 'Buscar imagens no Google',
-        url: `${BASE_URL}/api/scrape/google-images?query=gato&limit=10`,
-      },
-      {
-        description: 'Buscar imagens no Bing',
-        url: `${BASE_URL}/api/scrape/bing-images?query=gato&limit=10`,
-      },
-      {
-        description: 'Buscar imagens no DuckDuckGo',
-        url: `${BASE_URL}/api/scrape/duckduckgo-images?query=gato&limit=10`,
-      },
-      {
-        description: 'Buscar imagens no Yandex',
-        url: `${BASE_URL}/api/scrape/yandex-images?query=gato&limit=10`,
-      },
-      {
-        description: 'Buscar imagens no Brave',
-        url: `${BASE_URL}/api/scrape/brave-images?query=gato&limit=10`,
-      },
-    ],
+    //endpoints: {search_engines: [...knowledgeBases.keys()].map(engine => `${BASE_URL}/api/scrape/${engine}`)},
+    engines: [...knowledgeBases.keys()].map((engine: string) => engine),
+    usage_examples: {
+      description: `Buscar imagens`,
+      url: `${BASE_URL}/api/scrape/google?query=gato&limit=10`,
+      parameters: {
+        query: 'gato',
+        limit: '10'
+      }
+    }
   }))
 
   // =============================
-  // Sistema
+  // Health
   // =============================
-
   .get('/api/health', () => ({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    knowledgeBases: knowledgeBases.size,
+    knowledgeBases: knowledgeBases.size
   }))
 
   // =============================
-  // Bases de Conhecimento
+  // Knowledge Bases
   // =============================
-
   .get('/api/knowledge-bases', () => ({
-    data: Array.from(knowledgeBases.entries()).map(([name, url]) => ({ name, url })),
+    data: [...knowledgeBases.entries()].map(([name, url]) => ({ name, url }))
   }))
 
   .post(
     '/api/knowledge-base',
     ({ body }) => {
-      knowledgeBases.set(body.name, body.baseUrl);
-      return { message: 'Base adicionada com sucesso', ...body };
+      knowledgeBases.set(body.name, body.baseUrl)
+      return { message: 'Base adicionada', ...body }
     },
     {
-      body: t.Object({ name: t.String(), baseUrl: t.String() }),
-    },
-  )
-
-  .delete('/api/knowledge-base/:name', ({ params }) => {
-    if (!knowledgeBases.delete(params.name)) {
-      throw new Error('Base não encontrada');
+      body: t.Object({
+        name: t.String(),
+        baseUrl: t.String()
+      })
     }
-    return { message: 'Base removida', name: params.name };
-  })
-
-  // =============================
-  // Google Images
-  // =============================
-
-  .get(
-    '/api/scrape/google-images',
-    async ({ query }) => {
-      const page = Number(query.page ?? 1);
-      const limit = Number(query.limit ?? 20);
-
-      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(
-        query.query,
-      )}&tbm=isch&start=${(page - 1) * limit}`;
-
-      const { data } = await http.get(searchUrl);
-      const $ = cheerio.load(data);
-
-      const urls = unique(
-        $('img')
-          .map((_, el) => $(el).attr('src'))
-          .get()
-          .filter(src => src?.startsWith('http')) as string[],
-      );
-
-      const { data: images, pagination } = paginate(urls, page, limit);
-
-      return {
-        engine: 'google',
-        query: query.query,
-        images: images.map<ImageResult>((url, i) => ({
-          id: i + 1,
-          url,
-          thumbnail: url,
-          source: 'google',
-        })),
-        pagination,
-      };
-    },
-    {
-      query: t.Object({
-        query: t.String(),
-        page: t.Optional(t.String()),
-        limit: t.Optional(t.String()),
-      }),
-    },
   )
 
   // =============================
-  // Bing Images
+  // Scraper Genérico
   // =============================
-
   .get(
-    '/api/scrape/bing-images',
-    async ({ query }) => {
-      const page = Number(query.page ?? 1);
-      const limit = Number(query.limit ?? 20);
-      const first = (page - 1) * limit;
-
-      const url = `https://www.bing.com/images/search?q=${encodeURIComponent(
-        query.query,
-      )}&first=${first}&count=${limit}`;
-
-      const { data } = await http.get(url);
-      const $ = cheerio.load(data);
-
-      const images: ImageResult[] = [];
-
-      $('a.iusc').each((i, el) => {
-        const meta = $(el).attr('m');
-        if (!meta) return;
-        try {
-          const parsed = JSON.parse(meta);
-          images.push({
-            id: i + 1,
-            url: parsed.murl,
-            thumbnail: parsed.turl,
-            width: parsed.w,
-            height: parsed.h,
-            title: parsed.t,
-            source: 'bing',
-          });
-        } catch {}
-      });
-
-      return {
-        engine: 'bing',
-        query: query.query,
-        images,
-        pagination: {
-          currentPage: page,
-          hasNextPage: images.length >= limit,
-          nextPage: page + 1,
-        },
-      };
-    },
-    {
-      query: t.Object({
-        query: t.String(),
-        page: t.Optional(t.String()),
-        limit: t.Optional(t.String()),
-      }),
-    },
-  )
-
-  // =============================
-  // DuckDuckGo Images
-  // =============================
-
-  .get(
-    '/api/scrape/duckduckgo-images',
-    async ({ query }) => {
-      const page = Number(query.page ?? 1);
-      const limit = Number(query.limit ?? 20);
-
-      const searchUrl = `https://duckduckgo.com/?q=${encodeURIComponent(query.query)}&iax=images&ia=images`;
-      const { data } = await http.get(searchUrl);
-      const $ = cheerio.load(data);
-
-      const urls = unique(
-        $('img')
-          .map((_, el) => $(el).attr('src') || $(el).attr('data-src'))
-          .get()
-          .filter(src => src?.startsWith('http')) as string[],
-      );
-
-      const { data: images, pagination } = paginate(urls, page, limit);
-
-      return {
-        engine: 'duckduckgo',
-        query: query.query,
-        images: images.map((url, i) => ({
-          id: i + 1,
-          url,
-          thumbnail: url,
-          source: 'duckduckgo',
-        })),
-        pagination,
-      };
-    },
-    {
-      query: t.Object({
-        query: t.String(),
-        page: t.Optional(t.String()),
-        limit: t.Optional(t.String()),
-      }),
-    },
-  )
-
-  // =============================
-  // Yandex Images
-  // =============================
-
-  .get(
-    '/api/scrape/yandex-images',
-    async ({ query }) => {
-      const page = Number(query.page ?? 1);
-      const limit = Number(query.limit ?? 20);
-
-      const url = `https://yandex.com/images/search?text=${encodeURIComponent(query.query)}`;
-      const { data } = await http.get(url);
-      const $ = cheerio.load(data);
-
-      const urls = unique(
-        $('img')
-          .map((_, el) => $(el).attr('src'))
-          .get()
-          .filter(src => src?.startsWith('http')) as string[],
-      );
-
-      const { data: images, pagination } = paginate(urls, page, limit);
-
-      return {
-        engine: 'yandex',
-        query: query.query,
-        images: images.map((url, i) => ({
-          id: i + 1,
-          url,
-          thumbnail: url,
-          source: 'yandex',
-        })),
-        pagination,
-      };
-    },
-    {
-      query: t.Object({
-        query: t.String(),
-        page: t.Optional(t.String()),
-        limit: t.Optional(t.String()),
-      }),
-    },
-  )
-
-  // =============================
-  // Brave Images
-  // =============================
-
-  .get(
-    '/api/scrape/brave-images',
-    async ({ query }) => {
-      const page = Number(query.page ?? 1);
-      const limit = Number(query.limit ?? 20);
-
-      const url = `https://search.brave.com/images?q=${encodeURIComponent(query.query)}`;
-      const { data } = await http.get(url);
-      const $ = cheerio.load(data);
-
-      const urls = unique(
-        $('img')
-          .map((_, el) => $(el).attr('src'))
-          .get()
-          .filter(src => src?.startsWith('http')) as string[],
-      );
-
-      const { data: images, pagination } = paginate(urls, page, limit);
-
-      return {
-        engine: 'brave',
-        query: query.query,
-        images: images.map((url, i) => ({
-          id: i + 1,
-          url,
-          thumbnail: url,
-          source: 'brave',
-        })),
-        pagination,
-      };
-    },
-    {
-      query: t.Object({
-        query: t.String(),
-        page: t.Optional(t.String()),
-        limit: t.Optional(t.String()),
-      }),
-    },
-  )
-
-  // =============================
-  // Knowledge Base Scraper
-  // =============================
-
-  .get(
-    '/api/scrape/knowledge-base/:name',
+    '/api/scrape/:engine',
     async ({ params, query }) => {
-      const baseUrl = knowledgeBases.get(params.name);
-      if (!baseUrl) throw new Error('Base não encontrada');
-
-      const page = Number(query.page ?? 1);
-      const limit = Number(query.limit ?? 20);
-
-      const { data } = await http.get(baseUrl + encodeURIComponent(query.query));
-      const $ = cheerio.load(data);
-
+      const template = knowledgeBases.get(params.engine)
+      if (!template) throw new Error('Engine não encontrada')
+  
+      const page = Number(query.page ?? 1)
+      const limit = Number(query.limit ?? 20)
+  
+      const url = buildUrl(template, query.query, page)
+  
+      const { data } = await http.get(url)
+      const $ = cheerio.load(data)
+  
       const urls = unique(
         $('img')
-          .map((_, el) => $(el).attr('src'))
+          .map((_, el) => {
+            const $el = $(el)
+      
+            const raw =
+              $el.attr('src') ||
+              $el.attr('data-src') ||
+              $el.attr('data-lazy')
+      
+            if (!raw) return null
+      
+            // ❌ corta base64 na origem
+            if (raw.startsWith('data:image')) return null
+      
+            const normalized = normalizeImageUrl(raw, url)
+            if (!normalized) return null
+      
+            if (isSystemImage(normalized, $el)) return null
+      
+            return normalized
+          })
           .get()
-          .map(src => (src?.startsWith('http') ? src : new URL(src!, baseUrl).href)),
-      );
-
-      const { data: images, pagination } = paginate(urls, page, limit);
-
+          .filter(Boolean)
+      )
+      
+      
+  
+      const { data: images, pagination } = paginate(urls, page, limit)
+  
       return {
-        base: params.name,
+        engine: params.engine,
         query: query.query,
-        images: images.map<ImageResult>((url, i) => ({
+        url,
+        images: images.map((url, i): ImageResult => ({
           id: i + 1,
           url,
-          source: params.name,
+          thumbnail: url,
+          source: params.engine
         })),
-        pagination,
-      };
+        pagination
+      }
     },
     {
-      params: t.Object({ name: t.String() }),
+      params: t.Object({
+        engine: t.String()
+      }),
       query: t.Object({
         query: t.String(),
         page: t.Optional(t.String()),
-        limit: t.Optional(t.String()),
-      }),
-    },
+        limit: t.Optional(t.String())
+      })
+    }
   )
+  
 
-  .listen(PORT);
+  .listen(PORT)
 
-console.log(`🚀 API rodando em ${BASE_URL}`);
+console.log(`🚀 API rodando em ${BASE_URL}`)
