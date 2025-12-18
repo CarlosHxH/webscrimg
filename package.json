@@ -2,8 +2,10 @@
   "name": "app",
   "version": "1.0.50",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts"
+    "start": "bun run src/index.ts",
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir ./dist --target bun",
+    "preview": "bun run dist/src/index.js"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.0",
@@ -13,8 +15,16 @@
     "cheerio": "^1.1.2",
     "elysia": "latest"
   },
+  "main": "src/index.ts",
+  "type": "module",
+  "module": "src/index.ts",
   "devDependencies": {
-    "bun-types": "latest"
+    "@types/node": "^22.10.2",
+    "bun-types": "^1.1.38"
   },
-  "module": "src/index.js"
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
+  }
+
 }

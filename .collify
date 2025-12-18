@@ -1,0 +1,23 @@
+# Configuração para Coolify
+build:
+  type: nixpacks
+  nixpacks:
+    pkgs:
+      - nodejs_22
+      - bun
+    install_cmd: bun install
+    build_cmd: ""
+    start_cmd: bun run index.ts
+    
+environment:
+  NODE_ENV: production
+  PORT: 3000
+  
+healthcheck:
+  path: /api/health
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  
+ports:
+  - 3000:3000

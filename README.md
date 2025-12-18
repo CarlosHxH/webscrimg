@@ -1,58 +1,165 @@
-# 🚀 API de Web Scraper de Imagens
+# 🔍 API de Web Scraper de Imagens
 
-API completa para scraping de imagens do Google, Bing, DuckDuckGo e bases de conhecimento personalizadas com paginação e documentação Swagger.
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Elysia](https://img.shields.io/badge/Elysia-Framework-orange.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)
 
-## 📦 Instalação
+API moderna e performática para scraping de imagens de múltiplos motores de busca (Google, Bing, DuckDuckGo) e bases de conhecimento personalizadas. Construída com **Elysia** para máxima performance.
+
+## ✨ Características
+
+- 🚀 **Alta Performance** - Construída com Elysia (até 18x mais rápido que Express)
+- 🔎 **Múltiplos Motores** - Google, Bing e DuckDuckGo
+- 📚 **Bases Personalizadas** - Wikipedia, Unsplash, Pexels, Flickr, Pixabay e mais
+- 🔄 **Busca Combinada** - Pesquise em todos os motores simultaneamente
+- 📖 **Documentação Swagger** - Interface interativa completa
+- 🛡️ **TypeScript** - Totalmente tipado e seguro
+- 🌐 **CORS Habilitado** - Pronto para uso em qualquer aplicação
+- ⚡ **Paginação** - Suporte completo para navegação de resultados
+
+## 📋 Pré-requisitos
+
+- **Bun** >= 1.0.0 (recomendado) ou **Node.js** >= 18.0.0
+- **NPM** ou **Yarn** ou **Bun**
+
+## 🚀 Instalação
+
+### Usando Bun (Recomendado)
 
 ```bash
-npm install express axios cheerio swagger-ui-express swagger-jsdoc cors
+# Clone o repositório
+git clone https://github.com/seu-usuario/web-scraper-api.git
+cd web-scraper-api
+
+# Instale as dependências
+bun install
+
+# Inicie o servidor
+bun run src/index.ts
 ```
 
-## 🎯 Iniciar o Servidor
+### Usando NPM/Yarn
 
 ```bash
-node server.js
+# Clone o repositório
+git clone https://github.com/seu-usuario/web-scraper-api.git
+cd web-scraper-api
+
+# Instale as dependências
+npm install
 # ou
-node index.js
+yarn install
+
+# Inicie o servidor
+npm run dev
+# ou
+yarn dev
 ```
 
-O servidor estará disponível em `http://localhost:3000`
+## 📦 Dependências
 
-## 📖 Documentação
+```json
+{
+  "dependencies": {
+    "elysia": "^1.0.0",
+    "@elysiajs/swagger": "^1.0.0",
+    "@elysiajs/cors": "^1.0.0",
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0-rc.12"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
+```
 
-Acesse a documentação interativa do Swagger:
-- **Swagger UI**: http://localhost:3000/api-docs
-- **JSON Schema**: http://localhost:3000/api-docs.json
-- **Informações da API**: http://localhost:3000/
+## 🔧 Configuração
 
-## 🔍 Endpoints Disponíveis
+### Variáveis de Ambiente
 
-### Motores de Busca
+Crie um arquivo `.env` na raiz do projeto:
 
-#### 1. Google Images
+```env
+PORT=3000
+BASE_URL=http://localhost:3000
+```
+
+## 📚 Uso
+
+### Iniciando o Servidor
+
 ```bash
-GET /api/scrape/google-images?query=gatos&page=1&limit=20&safeSearch=on
+bun run src/index.ts
 ```
+
+O servidor iniciará em `http://localhost:3000`
+
+### Acessando a Documentação
+
+Acesse `http://localhost:3000/swagger` para a documentação interativa Swagger UI.
+
+## 🛣️ Endpoints
+
+### 🏠 Sistema
+
+#### GET `/`
+Informações gerais da API
+
+**Resposta:**
+```json
+{
+  "name": "API de Web Scraper de Imagens",
+  "version": "1.0.0",
+  "baseUrl": "http://localhost:3000",
+  "documentation": "http://localhost:3000/swagger"
+}
+```
+
+#### GET `/api/health`
+Verificar status da API
+
+**Resposta:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "knowledgeBasesCount": 5
+}
+```
+
+---
+
+### 🔍 Motores de Busca
+
+#### GET `/api/scrape/google-images`
+Buscar imagens no Google
 
 **Parâmetros:**
-- `query` (obrigatório): Termo de busca
-- `page` (opcional): Número da página (padrão: 1)
-- `limit` (opcional): Resultados por página (padrão: 20)
-- `safeSearch` (opcional): `on` ou `off` (padrão: on)
+- `query` (string, obrigatório) - Termo de busca
+- `page` (number, opcional) - Número da página (padrão: 1)
+- `limit` (number, opcional) - Resultados por página (padrão: 20)
+- `safeSearch` (string, opcional) - on/off (padrão: on)
 
-**Exemplo de resposta:**
+**Exemplo:**
+```bash
+curl "http://localhost:3000/api/scrape/google-images?query=gatos&limit=10"
+```
+
+**Resposta:**
 ```json
 {
   "query": "gatos",
   "engine": "google",
   "page": 1,
-  "limit": 20,
-  "total": 20,
+  "limit": 10,
+  "total": 10,
   "images": [
     {
       "id": 1,
-      "url": "https://...",
-      "thumbnail": "https://...",
+      "url": "https://example.com/image1.jpg",
+      "thumbnail": "https://example.com/thumb1.jpg",
       "source": "google"
     }
   ],
@@ -64,40 +171,69 @@ GET /api/scrape/google-images?query=gatos&page=1&limit=20&safeSearch=on
 }
 ```
 
-#### 2. Bing Images
-```bash
-GET /api/scrape/bing-images?query=cachorro&page=1&limit=20&safeSearch=Moderate
-```
+#### GET `/api/scrape/bing-images`
+Buscar imagens no Bing
 
 **Parâmetros:**
-- `query` (obrigatório): Termo de busca
-- `page` (opcional): Número da página (padrão: 1)
-- `limit` (opcional): Resultados por página (padrão: 20)
-- `safeSearch` (opcional): `Off`, `Moderate`, `Strict` (padrão: Moderate)
+- `query` (string, obrigatório)
+- `page` (number, opcional)
+- `limit` (number, opcional)
+- `safeSearch` (string, opcional) - Off/Moderate/Strict
 
-#### 3. DuckDuckGo Images
+**Exemplo:**
 ```bash
-GET /api/scrape/duckduckgo-images?query=paisagem&page=1&limit=20
+curl "http://localhost:3000/api/scrape/bing-images?query=paisagens&limit=10"
 ```
+
+#### GET `/api/scrape/duckduckgo-images`
+Buscar imagens no DuckDuckGo
 
 **Parâmetros:**
-- `query` (obrigatório): Termo de busca
-- `page` (opcional): Número da página (padrão: 1)
-- `limit` (opcional): Resultados por página (padrão: 20)
-- `safeSearch` (opcional): `on`, `moderate`, `off` (padrão: moderate)
+- `query` (string, obrigatório)
+- `page` (number, opcional)
+- `limit` (number, opcional)
 
-#### 4. Buscar em Todos os Motores
+**Exemplo:**
 ```bash
-GET /api/scrape/all-engines?query=natureza&limit=10
+curl "http://localhost:3000/api/scrape/duckduckgo-images?query=natureza&limit=10"
 ```
 
-Retorna resultados de Google, Bing e DuckDuckGo simultaneamente.
+#### GET `/api/scrape/all-engines`
+Buscar em todos os motores simultaneamente
 
-### Bases de Conhecimento
+**Parâmetros:**
+- `query` (string, obrigatório)
+- `limit` (number, opcional) - Limite por motor
 
-#### 5. Listar Bases
+**Exemplo:**
 ```bash
-GET /api/knowledge-bases
+curl "http://localhost:3000/api/scrape/all-engines?query=tecnologia&limit=5"
+```
+
+**Resposta:**
+```json
+{
+  "query": "tecnologia",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "totalImages": 15,
+  "engines": {
+    "google": { "images": [...] },
+    "bing": { "images": [...] },
+    "duckduckgo": { "images": [...] }
+  }
+}
+```
+
+---
+
+### 📚 Bases de Conhecimento
+
+#### GET `/api/knowledge-bases`
+Listar todas as bases de conhecimento disponíveis
+
+**Exemplo:**
+```bash
+curl "http://localhost:3000/api/knowledge-bases"
 ```
 
 **Resposta:**
@@ -116,198 +252,195 @@ GET /api/knowledge-bases
 }
 ```
 
-#### 6. Adicionar Base
-```bash
-POST /api/knowledge-base
-Content-Type: application/json
+#### POST `/api/knowledge-base`
+Adicionar nova base de conhecimento
 
+**Body:**
+```json
 {
   "name": "pixabay",
   "baseUrl": "https://pixabay.com/images/search/"
 }
 ```
 
-#### 7. Remover Base
+**Exemplo:**
 ```bash
-DELETE /api/knowledge-base/pixabay
-```
-
-#### 8. Buscar em Base Específica
-```bash
-GET /api/scrape/knowledge-base/wikipedia?query=tecnologia&page=1&limit=20
-```
-
-#### 9. Multi-Fonte
-```bash
-GET /api/scrape/multi-source?query=arte&sources=wikipedia,unsplash,pexels&limit=10
-```
-
-### Sistema
-
-#### 10. Health Check
-```bash
-GET /api/health
-```
-
-## 🧪 Exemplos de Uso
-
-### Com cURL
-
-```bash
-# Buscar no Google
-curl "http://localhost:3000/api/scrape/google-images?query=gatos%20fofos&limit=5"
-
-# Buscar no Bing
-curl "http://localhost:3000/api/scrape/bing-images?query=cachorro&page=1&limit=10"
-
-# Adicionar base de conhecimento
-curl -X POST http://localhost:3000/api/knowledge-base \
+curl -X POST "http://localhost:3000/api/knowledge-base" \
   -H "Content-Type: application/json" \
-  -d '{"name":"flickr","baseUrl":"https://www.flickr.com/search/?text="}'
-
-# Health check
-curl http://localhost:3000/api/health
+  -d '{"name":"pixabay","baseUrl":"https://pixabay.com/images/search/"}'
 ```
 
-### Com JavaScript/Fetch
+#### DELETE `/api/knowledge-base/:name`
+Remover uma base de conhecimento
 
-```javascript
-// Buscar imagens
-async function searchImages(query, engine = 'google') {
-  const response = await fetch(
-    `http://localhost:3000/api/scrape/${engine}-images?query=${encodeURIComponent(query)}&limit=10`
-  );
-  const data = await response.json();
-  return data;
-}
-
-// Usar
-searchImages('gatinhos', 'google').then(data => {
-  console.log('Imagens encontradas:', data.images.length);
-  data.images.forEach(img => {
-    console.log(img.url);
-  });
-});
+**Exemplo:**
+```bash
+curl -X DELETE "http://localhost:3000/api/knowledge-base/pixabay"
 ```
 
-### Com Python/Requests
+#### GET `/api/scrape/knowledge-base/:baseName`
+Buscar imagens em base específica
+
+**Parâmetros:**
+- `query` (string, obrigatório)
+- `page` (number, opcional)
+- `limit` (number, opcional)
+
+**Exemplo:**
+```bash
+curl "http://localhost:3000/api/scrape/knowledge-base/wikipedia?query=tecnologia&limit=10"
+```
+
+---
+
+## 💡 Exemplos de Uso
+
+### JavaScript/TypeScript
+
+```typescript
+// Buscar imagens no Google
+const response = await fetch(
+  'http://localhost:3000/api/scrape/google-images?query=gatos&limit=10'
+);
+const data = await response.json();
+console.log(data.images);
+
+// Buscar em todos os motores
+const allEngines = await fetch(
+  'http://localhost:3000/api/scrape/all-engines?query=paisagens&limit=5'
+);
+const results = await allEngines.json();
+console.log(results.totalImages);
+```
+
+### Python
 
 ```python
 import requests
 
-# Buscar imagens
+# Buscar imagens no Bing
 response = requests.get(
-    'http://localhost:3000/api/scrape/google-images',
-    params={'query': 'gatos', 'limit': 10}
+    'http://localhost:3000/api/scrape/bing-images',
+    params={'query': 'natureza', 'limit': 10}
 )
-
 data = response.json()
-print(f"Total de imagens: {data['total']}")
-
-for img in data['images']:
-    print(img['url'])
+print(data['images'])
 ```
 
-## ⚙️ Configuração
-
-### Variáveis de Ambiente
+### cURL
 
 ```bash
-PORT=3000  # Porta do servidor (padrão: 3000)
+# Buscar no DuckDuckGo
+curl "http://localhost:3000/api/scrape/duckduckgo-images?query=animais&limit=15"
+
+# Adicionar base de conhecimento
+curl -X POST "http://localhost:3000/api/knowledge-base" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"flickr","baseUrl":"https://www.flickr.com/search/?text="}'
 ```
 
-### CORS
+## 🐳 Docker
 
-A API está configurada para aceitar requisições de qualquer origem:
+### Dockerfile
 
-```javascript
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'DELETE', 'PUT', 'PATCH']
-}));
+```dockerfile
+FROM oven/bun:1
+
+WORKDIR /app
+
+COPY package.json bun.lockb ./
+RUN bun install
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["bun", "run", "src/index.ts"]
 ```
 
-## ⚠️ Limitações e Considerações
+### docker-compose.yml
 
-### Rate Limiting
-Motores de busca podem bloquear requisições excessivas. Recomendações:
-- Adicione delays entre requisições
-- Use proxies rotativos para produção
-- Considere APIs oficiais para uso comercial
+```yaml
+version: '3.8'
 
-### APIs Oficiais Recomendadas
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - BASE_URL=http://localhost:3000
+    restart: unless-stopped
+```
+
+### Executar com Docker
+
+```bash
+# Build
+docker build -t web-scraper-api .
+
+# Run
+docker run -p 3000:3000 web-scraper-api
+
+# Ou com docker-compose
+docker-compose up -d
+```
+
+## ⚠️ Avisos Importantes
+
+### Limitações de Web Scraping
+
+- **Rate Limiting**: Motores de busca podem bloquear requisições excessivas
+- **Bloqueios**: Google e Bing podem detectar e bloquear scraping
+- **Legalidade**: Verifique os termos de serviço antes de usar em produção
+- **APIs Oficiais**: Considere usar APIs oficiais para uso comercial
+
+### Recomendações
+
+Para uso em produção, considere:
 - **Google**: [Custom Search API](https://developers.google.com/custom-search)
 - **Bing**: [Bing Image Search API](https://www.microsoft.com/en-us/bing/apis/bing-image-search-api)
 - **Unsplash**: [Unsplash API](https://unsplash.com/developers)
+- **Pexels**: [Pexels API](https://www.pexels.com/api/)
 
-### Bloqueios
-Se você receber respostas vazias ou erros:
-1. Verifique os logs do console
-2. Tente com diferentes User-Agents
-3. Adicione delays entre requisições
-4. Use proxies ou VPNs
+## 🔒 Segurança
 
-## 🔧 Troubleshooting
-
-### Erro: "Failed to fetch"
-- Verifique se o servidor está rodando
-- Confirme a URL correta (http://localhost:3000)
-- Teste com cURL direto no terminal
-
-### Nenhuma imagem retornada
-- O site pode estar bloqueando scraping
-- Tente outro motor de busca
-- Verifique os logs do console para detalhes
-
-### Erro de CORS
-- CORS já está habilitado
-- Se persistir, verifique se há firewall/proxy bloqueando
-
-## 📝 Estrutura do Projeto
-
-```
-.
-├── server.js (ou index.js)    # Arquivo principal da API
-├── package.json                 # Dependências
-└── README.md                    # Esta documentação
-```
+- Não exponha a API publicamente sem autenticação
+- Implemente rate limiting para evitar abuso
+- Use HTTPS em produção
+- Valide e sanitize todas as entradas do usuário
 
 ## 🤝 Contribuindo
 
-1. Adicione novos motores de busca
-2. Melhore os seletores de scraping
-3. Adicione cache para resultados
-4. Implemente rate limiting
-5. Adicione autenticação
+Contribuições são bem-vindas! Por favor:
 
-## 📄 Licença
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/MinhaFeature`)
+3. Commit suas mudanças (`git commit -m 'Adiciona MinhaFeature'`)
+4. Push para a branch (`git push origin feature/MinhaFeature`)
+5. Abra um Pull Request
 
-MIT License - Sinta-se livre para usar e modificar.
+## 📝 Licença
 
-## 🎯 Roadmap
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
-- [ ] Cache Redis para resultados
-- [ ] Rate limiting por IP
-- [ ] Autenticação JWT
-- [ ] Suporte a mais motores (Yahoo, Yandex)
-- [ ] Download automático de imagens
-- [ ] Filtros avançados (tamanho, cor, tipo)
-- [ ] Websocket para streaming de resultados
-- [ ] Dashboard web para visualização
+## 👨‍💻 Autor
 
-## 💡 Dicas de Uso
+Desenvolvido com ❤️ usando Elysia
 
-### Paginação Eficiente
-```javascript
-// Buscar múltiplas páginas
-async function getAllPages(query, maxPages = 3) {
-  const results = [];
-  for (let page = 1; page <= maxPages; page++) {
-    const data = await fetch(
-      `http://localhost:3000/api/scrape/google-images?query=${query}&page=${page}&limit=20`
-    ).then(r => r.json());
-    results.push(...data.images);
-    await new Promise(r => setTimeout(r, 2000)); // Delay de 2s
-  }
-  return results;
-}
+## 📞 Suporte
+
+- 📧 Email: support@webscraper.com
+- 🐛 Issues: [GitHub Issues](https://github.com/seu-usuario/web-scraper-api/issues)
+- 📖 Documentação: [Swagger UI](http://localhost:3000/swagger)
+
+## 🙏 Agradecimentos
+
+- [Elysia](https://elysiajs.com/) - Framework web moderno
+- [Cheerio](https://cheerio.js.org/) - jQuery para Node.js
+- [Axios](https://axios-http.com/) - Cliente HTTP
+
+---
+
+⭐ Se este projeto foi útil, considere dar uma estrela no GitHub!
