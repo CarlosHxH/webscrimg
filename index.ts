@@ -121,7 +121,8 @@ function isSystemImage(
     '_next',
     'static',
     'assets',
-    'favicon'
+    'favicon',
+    'gif'
   ]
 
   if (blocked.some(k => lowerUrl.includes(k))) {
@@ -172,29 +173,6 @@ function normalizeImageUrl(src: string, base: string) {
     return null
   }
 }
-
-const BLOCKED_PATH_KEYWORDS = [
-  'logo',
-  'logos',
-  'icon',
-  'icons',
-  'sprite',
-  'ui',
-  'header',
-  'footer',
-  'menu',
-  'navbar',
-  'brand',
-  'branding',
-  'flag',
-  'flags',
-  'region',
-  'regions',
-  '_next',
-  'static',
-  'assets',
-  'favicon'
-]
 
 
 // =============================
