@@ -1,4 +1,4 @@
-import { Elysia, t } from 'elysia'
+import { Elysia, file, t } from 'elysia'
 import { swagger } from '@elysiajs/swagger'
 import { cors } from '@elysiajs/cors'
 import axios from 'axios'
@@ -57,7 +57,10 @@ const knowledgeBases = new Map<string, string>([
   ['mato-grosso-do-sul', 'https://www.matogrossodosuldistribuidora.com.br/produtos/bp.asp?busca={query}'],
   ['hipervarejo', 'https://www.hipervarejo.com.br/search?paged={page}&q={query}'],
   ['jbs', 'https://www.jbs.com.br/produtos/bp.asp?busca={query}'],
-  ['jocar', 'https://www.jocar.com.br/{query}']
+  ['jocar', 'https://www.jocar.com.br/{query}'],
+  ['rochapecas', 'https://www.rochapecas.com.br/{query} '],
+  ['morelate', 'https://www.morelate.com.br/{query}'],
+  ['magazineluiza', 'https://www.magazineluiza.com.br/busca/{query}']
 ])
 // =============================
 // Filtros de Imagem
@@ -260,6 +263,7 @@ const app = new Elysia()
     docs: `${BASE_URL}/swagger`
   }))
 
+  .get('/index.html', () => file('./index.html'))
   // =============================
   // Health
   // =============================
